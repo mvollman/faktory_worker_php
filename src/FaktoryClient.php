@@ -80,7 +80,10 @@ class FaktoryClient {
             $response = $this->readLine($socket);
 
             $requestDefaults = [
-                'v' => 2
+                'v' => 2,
+                'hostname' => gethostname(),
+                'pid' => getmypid(),
+                'labels' => ['php']
             ];
 
             // If the client is a worker, send the wid with request
