@@ -37,7 +37,7 @@ class FaktoryClient {
 
     public function fetch($queues = array('default')) {
         $socket = $this->connect();
-        $this->logger->debug('Fetching job', ['queues' => $queues]);
+        $this->logger->info('Fetching job', ['queues' => $queues]);
         $response = $this->writeLine($socket, 'FETCH', implode(' ', $queues));
         $char = $response[0];
         if ($char === '$') {
@@ -121,7 +121,7 @@ class FaktoryClient {
     
                 $this->writeLine($socket, 'HELLO', json_encode($requestDefaults));
             }
-            $this->logger->debug('Connected to Faktory', ['host' => $this->faktoryHost, 'port' => $this->faktoryPort]);
+            $this->logger->info('Connected to Faktory', ['host' => $this->faktoryHost, 'port' => $this->faktoryPort]);
             return $socket;
         }
     }
