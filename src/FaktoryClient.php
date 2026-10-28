@@ -30,14 +30,14 @@ class FaktoryClient {
 
     public function push($job) {
         $socket = $this->connect();
-        $this->logger->info('Pushing job', ['job' => $job]);
+        $this->logger->debug('Pushing job', ['job' => $job]);
         $this->writeLine($socket, 'PUSH', json_encode($job));
         $this->close($socket);
     }
 
     public function fetch($queues = array('default')) {
         $socket = $this->connect();
-        $this->logger->info('Fetching job', ['queues' => $queues]);
+        $this->logger->debug('Fetching job', ['queues' => $queues]);
         $response = $this->writeLine($socket, 'FETCH', implode(' ', $queues));
         $char = $response[0];
         if ($char === '$') {
