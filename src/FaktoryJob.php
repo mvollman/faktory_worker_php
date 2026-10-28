@@ -7,18 +7,24 @@ class FaktoryJob implements \JsonSerializable {
     private $type;
     private $args;
     private $at;
+    private $queue;
+    private $priority;
 
-    public function __construct($type, $args) {
+    public function __construct($type, $args, $queue = "default", $priority = 5) {
         $this->id = uniqid();
         $this->type = $type;
         $this->args = $args;
         $this->at = date(DATE_RFC3339);
+        $this->queue = $queue;
+        $this->priority = $priority;
     }
 
     public function jsonSerialize() {
         return [
             'jid' => $this->id,
+            'queue' => $this->queue,
             'jobtype' => $this->type,
+            'priority' => $this->priority,
             'args' => $this->args,
             'at' => $this->at,
         ];

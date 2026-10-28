@@ -13,10 +13,10 @@ class FaktoryWorker {
     private $id = null;
     private LoggerInterface $logger;
     
-    public function __construct($client, $processId = null, ?LoggerInterface $logger = null) {
+    public function __construct($client, $processId = null, ?LoggerInterface $logger = null, $queues = array('default')) {
         $this->logger = $logger ?? new NullLogger();
         $this->client = $client;
-        $this->queues = array('default');
+        $this->queues = $queues;
         $this->id = $processId ?: substr(sha1(rand()), 0, 32);
         $this->client->setWorker($this);
     }
