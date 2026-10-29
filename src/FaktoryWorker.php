@@ -78,7 +78,6 @@ class FaktoryWorker {
             if ($pid === 0) {
                 pcntl_signal(SIGTERM, function () { $this->stop = true; });
                 pcntl_signal(SIGINT, function () { $this->stop = true; });
-                $this->id = $baseId . '-' . $slot;
                 $this->client->forgetConnection();
                 try {
                     $this->loop($daemonize);
