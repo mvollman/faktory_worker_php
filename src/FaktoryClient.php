@@ -59,6 +59,22 @@ class FaktoryClient {
     }
 
     /**
+     * Sends a BEAT for the given worker id. Returns the server's requested
+     * state ("quiet" or "terminate") or null if everything is normal.
+     */
+    public function beat($workerId) {
+        $response = $this->command('BEAT', json_encode(['wid' => $workerId]));
+        if ($response[0] === '$') {
+            $count = (int) trim(substr($response, 1));
+            if ($count > 0) {
+                $data = json_decode(substr($this->readBytes($this->socket, $count + 2), 0, $count), true);
+                return $data['state'] ?? null;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Closes the persistent connection. A new one is opened on the next command.
      */
     public function close() {

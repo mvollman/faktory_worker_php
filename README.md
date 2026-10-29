@@ -106,3 +106,8 @@ and restarts any that exit when daemonized:
 ```php
 $worker->run(true, 5);
 ```
+
+While running, each worker process sends a `BEAT` with its worker ID to Faktory every 15 seconds from
+a forked helper process on its own connection (requires `pcntl`; without it, heartbeats are disabled).
+If Faktory replies with `quiet`, the worker stops fetching new jobs but lets the current job finish and
+keeps beating; if it replies with `terminate`, the worker finishes its current job and shuts down.
