@@ -10,6 +10,7 @@ class FaktoryClient {
     private $faktoryPort;
     private $faktoryPassword;
     private $worker;
+    private $pid;
     private $socket = null;
     private LoggerInterface $logger;
 
@@ -19,6 +20,7 @@ class FaktoryClient {
         $this->faktoryPort = $port;
         $this->faktoryPassword = $password;
         $this->worker = null;
+        $this->pid = getmypid();
     }
 
     public function setLogger(LoggerInterface $logger) {
@@ -133,7 +135,7 @@ class FaktoryClient {
             $requestDefaults = [
                 'v' => 2,
                 'hostname' => gethostname(),
-                'pid' => getmypid(),
+                'pid' => $this->pid,
                 'labels' => ['php']
             ];
 
