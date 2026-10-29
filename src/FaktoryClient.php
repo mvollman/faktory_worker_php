@@ -10,6 +10,7 @@ class FaktoryClient {
     private $faktoryPort;
     private $faktoryPassword;
     private $worker;
+    private $socket = null;
     private LoggerInterface $logger;
 
     public function __construct($host, $port, $password = null, ?LoggerInterface $logger = null) {
@@ -29,43 +30,69 @@ class FaktoryClient {
     }
 
     public function push($job) {
-        $socket = $this->connect();
         $this->logger->debug('Pushing job', ['job' => $job]);
-        $this->writeLine($socket, 'PUSH', json_encode($job));
-        $this->close($socket);
+        $this->command('PUSH', json_encode($job));
     }
 
     public function fetch($queues = array('default')) {
-        $socket = $this->connect();
         $this->logger->debug('Fetching job', ['queues' => $queues]);
-        $response = $this->writeLine($socket, 'FETCH', implode(' ', $queues));
-        $char = $response[0];
-        if ($char === '$') {
-            $count = trim(substr($response, 1, strpos($response, "\r\n")));
-            $data = null;
+        $response = $this->command('FETCH', implode(' ', $queues));
+        if ($response[0] === '$') {
+            $count = (int) trim(substr($response, 1));
             if ($count > 0) {
-                $data = $this->readLine($socket);
-                $this->close($socket);
-                return json_decode($data, true);
+                $data = $this->readBytes($this->socket, $count + 2);
+                return json_decode(substr($data, 0, $count), true);
             }
-            return $data;
+            return null;
         }
-        $this->close($socket);
         return $response;
     }
 
     public function ack($jobId) {
-        $socket = $this->connect();
         $this->logger->info('Acknowledging job', ['jid' => $jobId]);
-        $this->writeLine($socket, 'ACK', json_encode(['jid' => $jobId]));
-        $this->close($socket);
+        $this->command('ACK', json_encode(['jid' => $jobId]));
     }
 
     public function fail($jobId) {
-        $socket = $this->connect();
         $this->logger->warning('Failing job', ['jid' => $jobId]);
-        $this->writeLine($socket, 'FAIL', json_encode(['jid' => $jobId]));
-        $this->close($socket);
+        $this->command('FAIL', json_encode(['jid' => $jobId]));
+    }
+
+    /**
+     * Closes the persistent connection. A new one is opened on the next command.
+     */
+    public function close() {
+        if ($this->socket) {
+            @fwrite($this->socket, "END\r\n");
+            @fclose($this->socket);
+        }
+        $this->socket = null;
+    }
+
+    public function __destruct() {
+        $this->close();
+    }
+
+    // Sends a command over the persistent connection, reconnecting once if it was dropped.
+    private function command($command, $payload) {
+        for ($attempt = 0; ; $attempt++) {
+            if (!$this->socket) {
+                $this->socket = $this->connect();
+                if (!$this->socket) {
+                    throw new \RuntimeException('Unable to connect to Faktory');
+                }
+            }
+            try {
+                return $this->writeLine($this->socket, $command, $payload);
+            } catch (\RuntimeException $e) {
+                $this->logger->warning('Faktory connection lost', ['error' => $e->getMessage()]);
+                @fclose($this->socket);
+                $this->socket = null;
+                if ($attempt >= 1) {
+                    throw $e;
+                }
+            }
+        }
     }
 
     private function connect() {
@@ -127,21 +154,34 @@ class FaktoryClient {
     }
 
     private function readLine($socket) {
-        $contents = fgets($socket, 1024);
-        while (strpos($contents, "\r\n") === false) {
-            $contents .= fgets($socket, 1024 - strlen($contents));
-        }
+        $contents = '';
+        do {
+            $chunk = fgets($socket, 1024);
+            if ($chunk === false) {
+                throw new \RuntimeException('Connection to Faktory closed');
+            }
+            $contents .= $chunk;
+        } while (substr($contents, -2) !== "\r\n");
         return $contents;
+    }
+
+    private function readBytes($socket, $length) {
+        $data = '';
+        while (strlen($data) < $length) {
+            $chunk = fread($socket, $length - strlen($data));
+            if ($chunk === false || $chunk === '') {
+                throw new \RuntimeException('Connection to Faktory closed');
+            }
+            $data .= $chunk;
+        }
+        return $data;
     }
 
     private function writeLine($socket, $command, $json) {
         $buffer = $command.' '.$json."\r\n";
-        stream_socket_sendto($socket, $buffer);
-        $read = $this->readLine($socket);
-        return $read;
-    }
-
-    private function close($socket) {
-        fclose($socket);
+        if (@fwrite($socket, $buffer) === false) {
+            throw new \RuntimeException('Failed to write to Faktory');
+        }
+        return $this->readLine($socket);
     }
 }
