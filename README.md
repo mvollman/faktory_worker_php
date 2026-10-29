@@ -98,3 +98,11 @@ $worker->register('cooljob2', function($job) {
 
 $worker->run(true);
 ```
+
+To process several jobs at once, pass a concurrency as the second argument. This forks that many
+child processes (requires the `pcntl` extension), each with its own Faktory connection and worker ID,
+and restarts any that exit when daemonized:
+
+```php
+$worker->run(true, 5);
+```

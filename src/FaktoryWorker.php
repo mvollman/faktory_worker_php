@@ -37,7 +37,84 @@ class FaktoryWorker {
         $this->jobTypes[$jobType] = $callable;
     }
 
-    public function run($daemonize = false) {
+    /**
+     * @param bool $daemonize    Keep running until stopped.
+     * @param int  $concurrency  Number of jobs processed in parallel. Values above 1
+     *                           fork that many child processes (requires ext-pcntl),
+     *                           each with its own Faktory connection and worker ID.
+     */
+    public function run($daemonize = false, $concurrency = 1) {
+        if ($concurrency <= 1) {
+            $this->loop($daemonize);
+            return;
+        }
+        if (!function_exists('pcntl_fork')) {
+            throw new \RuntimeException('Concurrency requires the pcntl extension');
+        }
+        $this->runConcurrent($daemonize, (int) $concurrency);
+    }
+
+    private function runConcurrent($daemonize, $concurrency) {
+        $children = [];
+        $baseId = $this->id;
+        $stopping = false;
+
+        pcntl_async_signals(true);
+        $handler = function ($signo) use (&$children, &$stopping) {
+            $stopping = true;
+            foreach (array_keys($children) as $pid) {
+                posix_kill($pid, $signo);
+            }
+        };
+        pcntl_signal(SIGTERM, $handler);
+        pcntl_signal(SIGINT, $handler);
+
+        $spawn = function ($slot) use (&$children, $baseId, $daemonize) {
+            $pid = pcntl_fork();
+            if ($pid === -1) {
+                throw new \RuntimeException('Unable to fork worker process');
+            }
+            if ($pid === 0) {
+                pcntl_signal(SIGTERM, function () { $this->stop = true; });
+                pcntl_signal(SIGINT, function () { $this->stop = true; });
+                $this->id = $baseId . '-' . $slot;
+                $this->client->forgetConnection();
+                try {
+                    $this->loop($daemonize);
+                } catch (\Throwable $e) {
+                    $this->logger->error('Worker process crashed: ' . $e->getMessage(), ['exception' => $e]);
+                    exit(1);
+                }
+                exit(0);
+            }
+            $children[$pid] = $slot;
+        };
+
+        // The parent must not keep a connection that children would share.
+        $this->client->forgetConnection();
+        for ($slot = 0; $slot < $concurrency; $slot++) {
+            $spawn($slot);
+        }
+
+        while ($children) {
+            $pid = pcntl_wait($status);
+            if ($pid <= 0) {
+                if ($pid === -1 && pcntl_get_last_error() === PCNTL_ECHILD) {
+                    break;
+                }
+                continue;
+            }
+            $slot = $children[$pid] ?? null;
+            unset($children[$pid]);
+            if ($daemonize && !$stopping && $slot !== null) {
+                $this->logger->warning('Worker process exited, restarting', ['pid' => $pid, 'slot' => $slot]);
+                sleep(1);
+                $spawn($slot);
+            }
+        }
+    }
+
+    private function loop($daemonize) {
         do {
             $job = $this->client->fetch($this->queues);
 

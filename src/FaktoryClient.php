@@ -69,6 +69,14 @@ class FaktoryClient {
         $this->socket = null;
     }
 
+    /**
+     * Drops the connection without telling the server, for use in a forked child
+     * that inherited the parent's socket.
+     */
+    public function forgetConnection() {
+        $this->socket = null;
+    }
+
     public function __destruct() {
         $this->close();
     }
