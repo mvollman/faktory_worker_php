@@ -16,7 +16,7 @@ class FaktoryWorker {
     private $id = null;
     private LoggerInterface $logger;
     
-    public function __construct($client, $processId = null, ?LoggerInterface $logger = null, $queues = array('default'), $statusAddress = "tcp://127.0.0..1:7420") {
+    public function __construct($client, $processId = null, ?LoggerInterface $logger = null, $queues = array('default'), $statusAddress = "tcp://127.0.0.1:7420") {
         $this->logger = $logger ?? new NullLogger();
         $this->client = $client;
         $this->queues = $queues;
