@@ -107,6 +107,14 @@ and restarts any that exit when daemonized:
 $worker->run(true, 5);
 ```
 
+To query how many jobs are currently in progress, expose a status socket. Each connection receives the
+count followed by a newline and is then closed (requires `pcntl`; workers are forked even with concurrency 1):
+
+```php
+$worker->setStatusSocket('tcp://127.0.0.1:7420'); // or 'unix:///tmp/faktory-worker.sock'
+$worker->run(true, 5);
+```
+
 While running, each worker process sends a `BEAT` with its worker ID to Faktory every 15 seconds from
 a forked helper process on its own connection (requires `pcntl`; without it, heartbeats are disabled).
 If Faktory replies with `quiet`, the worker stops fetching new jobs but lets the current job finish and
