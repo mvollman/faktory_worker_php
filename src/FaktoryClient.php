@@ -37,7 +37,6 @@ class FaktoryClient {
     }
 
     public function fetch($queues = array('default')) {
-        $this->logger->debug('Fetching job', ['queues' => $queues]);
         $response = $this->command('FETCH', implode(' ', $queues));
         if ($response[0] === '$') {
             $count = (int) trim(substr($response, 1));
