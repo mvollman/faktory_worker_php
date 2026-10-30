@@ -107,11 +107,11 @@ and restarts any that exit when daemonized:
 $worker->run(true, 5);
 ```
 
-To query how many jobs are currently in progress, expose a status socket. Each connection receives the
-count followed by a newline and is then closed (requires `pcntl`; workers are forked even with concurrency 1):
+To query how many jobs are currently in progress, expose a status HTTP endpoint. `GET /status` returns
+`{"in_progress": N}` (requires `pcntl`; workers are forked even with concurrency 1):
 
 ```php
-$worker->setStatusSocket('tcp://127.0.0.1:7420'); // or 'unix:///tmp/faktory-worker.sock'
+$worker->setStatusSocket('tcp://127.0.0.1:7420'); // curl http://127.0.0.1:7420/status
 $worker->run(true, 5);
 ```
 

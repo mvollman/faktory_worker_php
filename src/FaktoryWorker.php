@@ -38,8 +38,8 @@ class FaktoryWorker {
     }
 
     /**
-     * Listen on a socket (e.g. "unix:///tmp/faktory-worker.sock" or "tcp://127.0.0.1:7420")
-     * that replies with the number of in-progress jobs, then closes, on each connection.
+     * Serve an HTTP endpoint (e.g. "tcp://127.0.0.1:7420"); GET / or GET /status
+     * returns {"in_progress": N} with the number of in-progress jobs.
      * Requires ext-pcntl; run() forks workers even when concurrency is 1.
      */
     public function setStatusSocket($address) {
@@ -170,7 +170,13 @@ class FaktoryWorker {
             }
         }
         while ($conn = @stream_socket_accept($server, 0)) {
-            fwrite($conn, array_sum($counts) . "\n");
+            stream_set_timeout($conn, 0, 200000);
+            $request = (string) fgets($conn, 2048);
+            $ok = preg_match('#^GET /(status)?(\?\S*)? HTTP/#', $request) === 1;
+            $body = $ok ? json_encode(['in_progress' => array_sum($counts)]) : json_encode(['error' => 'not found']);
+            fwrite($conn, ($ok ? "HTTP/1.1 200 OK" : "HTTP/1.1 404 Not Found") . "\r\n"
+                . "Content-Type: application/json\r\nContent-Length: " . strlen($body)
+                . "\r\nConnection: close\r\n\r\n" . $body);
             fclose($conn);
         }
     }
