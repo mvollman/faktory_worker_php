@@ -160,6 +160,10 @@ class FaktoryWorker {
                 $spawn($slot);
             }
         }
+        if ($server) {
+            fclose($server);
+        }
+        $this->client->close();
     }
 
     private function serveStatus($server, $pipes, &$counts) {
@@ -231,11 +235,13 @@ class FaktoryWorker {
 
     private function loop($daemonize) {
         $heartbeat = $this->startHeartbeat();
-        if ($heartbeat) {
+        if (function_exists('pcntl_signal')) {
             pcntl_async_signals(true);
-            if (!pcntl_signal_get_handler(SIGTERM)) {
-                pcntl_signal(SIGTERM, function () { $this->stop = true; });
-            }
+            $onStop = function () { $this->stop = true; };
+            pcntl_signal(SIGTERM, $onStop);
+            pcntl_signal(SIGINT, $onStop);
+        }
+        if ($heartbeat) {
             // Quiet: stop fetching new jobs; the job in progress finishes normally
             pcntl_signal(SIGUSR1, function () {
                 if (!$this->quiet) {
@@ -248,6 +254,7 @@ class FaktoryWorker {
             $this->work($daemonize);
         } finally {
             $this->stopHeartbeat($heartbeat);
+            $this->client->close();
         }
     }
 
