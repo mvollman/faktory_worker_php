@@ -9,6 +9,7 @@ class FaktoryWorker {
     private $client;
     private $queues;
     private $jobTypes = [];
+    private $terminate = false;
     private $stop = false;
     private $quiet = false;
     private $statusAddress = null;
@@ -107,7 +108,7 @@ class FaktoryWorker {
                 }
                 fclose($pair[0]);
                 $this->statusPipe = $pair[1];
-                pcntl_signal(SIGTERM, function () { $this->stop = true; });
+                pcntl_signal(SIGTERM, function () { $this->terminate = true; });
                 pcntl_signal(SIGINT, function () { $this->stop = true; });
                 $this->client->forgetConnection();
                 try {
@@ -154,7 +155,7 @@ class FaktoryWorker {
                 unset($pipes[$slot]);
                 $counts[$slot] = 0;
             }
-            if ($daemonize && !$stopping && $slot !== null) {
+            if ($daemonize && !$stopping && $slot !== null && !$this->terminate) {
                 $this->logger->warning('Worker process exited, restarting', ['pid' => $pid, 'slot' => $slot]);
                 sleep(1);
                 $spawn($slot);
@@ -238,7 +239,8 @@ class FaktoryWorker {
         if (function_exists('pcntl_signal')) {
             pcntl_async_signals(true);
             $onStop = function () { $this->stop = true; };
-            pcntl_signal(SIGTERM, $onStop);
+            $onTerminate = function () { $this->terminate = true; };
+            pcntl_signal(SIGTERM, $onTerminate);
             pcntl_signal(SIGINT, $onStop);
         }
         if ($heartbeat) {
