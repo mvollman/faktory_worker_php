@@ -207,7 +207,7 @@ class FaktoryWorker {
                 $state = $this->client->beat($this->id);
                 if ($state === 'terminate') {
                     $this->logger->info('Faktory requested shutdown', ['wid' => $this->id]);
-                    posix_kill($parent, SIGTERM);
+                    exit(0);
                 } elseif ($state === 'quiet') {
                     posix_kill($parent, SIGUSR1);
                 }
