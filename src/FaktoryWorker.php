@@ -208,8 +208,14 @@ class FaktoryWorker {
         pcntl_signal(SIGUSR1, SIG_DFL);
         $this->client->forgetConnection();
         while (posix_getppid() === $parent) {
-            try {
-                $state = $this->client->beat($this->id);
+      try {
+                if ($this->terminate) {
+                    $state = $this->client->beat($this->id, 'terminate');
+                } elseif ($this->quiet) {
+                    $state = $this->client->beat($this->id, 'quiet');
+                } else {
+                    $state = $this->client->beat($this->id);
+                }
                 if ($state === 'terminate') {
                     $this->logger->info('Faktory requested shutdown', ['wid' => $this->id]);
                     posix_kill($parent, SIGTERM);

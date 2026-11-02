@@ -63,8 +63,12 @@ class FaktoryClient {
      * Sends a BEAT for the given worker id. Returns the server's requested
      * state ("quiet" or "terminate") or null if everything is normal.
      */
-    public function beat($workerId) {
-        $response = $this->command('BEAT', json_encode(['wid' => $workerId]));
+    public function beat($workerId, $state = null) {
+        if ($state === null) {
+            $response = $this->command('BEAT', json_encode(['wid' => $workerId]));
+        } else {
+            $response = $this->command('BEAT', json_encode(['wid' => $workerId, 'current_state' => $state]));
+        }
         if ($response[0] === '$') {
             $count = (int) trim(substr($response, 1));
             if ($count > 0) {
