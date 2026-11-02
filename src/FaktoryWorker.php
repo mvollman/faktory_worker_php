@@ -108,7 +108,7 @@ class FaktoryWorker {
                 }
                 fclose($pair[0]);
                 $this->statusPipe = $pair[1];
-                pcntl_signal(SIGTERM, function () { $this->terminate = true; });
+                pcntl_signal(SIGTERM, function () { $this->terminate = true; $this->stop = true; });
                 pcntl_signal(SIGINT, function () { $this->stop = true; });
                 $this->client->forgetConnection();
                 try {
@@ -155,10 +155,14 @@ class FaktoryWorker {
                 unset($pipes[$slot]);
                 $counts[$slot] = 0;
             }
-            if ($daemonize && !$stopping && $slot !== null && !$this->terminate) {
-                $this->logger->warning('Worker process exited, restarting', ['pid' => $pid, 'slot' => $slot]);
+            // A clean exit means the worker was told to stop, so only crashes are respawned
+            $cleanExit = pcntl_wifexited($status) && pcntl_wexitstatus($status) === 0;
+            if ($daemonize && !$stopping && !$cleanExit && $slot !== null) {
+                $this->logger->warning('Worker process crashed, restarting', ['pid' => $pid, 'slot' => $slot]);
                 sleep(1);
-                $spawn($slot);
+                if (!$stopping) {
+                    $spawn($slot);
+                }
             }
         }
         if ($server) {
@@ -245,7 +249,7 @@ class FaktoryWorker {
         if (function_exists('pcntl_signal')) {
             pcntl_async_signals(true);
             $onStop = function () { $this->stop = true; };
-            $onTerminate = function () { $this->terminate = true; };
+            $onTerminate = function () { $this->terminate = true; $this->stop = true; };
             pcntl_signal(SIGTERM, $onTerminate);
             pcntl_signal(SIGINT, $onStop);
         }
